@@ -20,16 +20,20 @@ install:
 
 .PHONY: linter_checks  ## Check code format
 linter_checks:
-	pylint src
-	black . --check
-	isort . --check --gitignore
-	flake8 src
-	flake8 tests
+	poetry run pylint src
+	poetry run black . --check
+	poetry run isort . --check --gitignore
+	poetry run flake8 src
+	poetry run flake8 tests
 
 .PHONY: lint_code  ## Lint code
 lint_code:
-	black .
-	isort . --gitignore
-	flake8 .
-	autoflake -i --remove-all-unused-imports -r --ignore-init-module-imports . --exclude venv
+	poetry run black .
+	poetry run isort . --gitignore
+	poetry run flake8 .
+	poetry run autoflake -i --remove-all-unused-imports -r --ignore-init-module-imports . --exclude venv
 
+
+.PHONY: unit_test  ## Run unit tests
+unit_test:
+	poetry run pytest

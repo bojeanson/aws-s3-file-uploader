@@ -8,6 +8,6 @@ build
 *.iml
 *.DS_Store
 *.eggs
-*venv
+*.venv
 *vscode
 src/stream-manager/

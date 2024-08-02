@@ -13,11 +13,11 @@
 #  limitations under the License.
 
 import asyncio
-import glob
 import logging
 import ntpath
 import os
 from pathlib import Path
+from typing import List
 from urllib.parse import urlparse
 
 from stream_manager import (
@@ -39,18 +39,26 @@ from stream_manager import (
 from stream_manager.util import Util
 
 
-class DirectoryUploader:
-    """DirectoryUploader monitors a folder for new files and upload those new files to S2 via stream manager"""
+class DirectoryWatcher:
+    """DirectoryWatcher monitors a folder for new files and upload those new files to S2 via stream manager"""
 
     __stream_name = "DirectoryUploader"
     __status_stream_name = "DirectoryUploaderStatus"
 
     def __init__(
-        self, pathname, bucket_name, bucket_path, interval, logger: logging.Logger, client: StreamManagerClient = None
+        self,
+        bucket_name: str,
+        directory_to_monitor: Path,
+        file_extensions_to_monitor: List[str],
+        bucket_prefix: str,
+        logger: logging.Logger,
+        interval: int,
+        client: StreamManagerClient = None,
     ):
-        self.__pathname = pathname
+        self.__directory_to_monitor = directory_to_monitor
+        self.__file_extensions_to_monitor = file_extensions_to_monitor
         self.__bucket_name = bucket_name
-        self.__bucket_path = bucket_path.removeprefix("/").removesuffix("/")
+        self.__bucket_path = bucket_prefix.removeprefix("/").removesuffix("/")
         self.__stream_name = bucket_name + "Stream"
         self.__status_stream_name = self.__stream_name + "Status"
         self.__client = client
@@ -109,14 +117,17 @@ class DirectoryUploader:
         keep_looping = True
         while keep_looping:
             try:
-                base_dir = Path(self.__pathname).parent
-                if ntpath.isdir(base_dir) and os.access(base_dir, os.R_OK | os.W_OK | os.X_OK):
-                    self.__logger.info(f"Scanning folder {self.__pathname} for change ====")
-                    files = glob.glob(self.__pathname)
+                if self.__directory_to_monitor.is_dir() and os.access(
+                    self.__directory_to_monitor, os.R_OK | os.W_OK | os.X_OK
+                ):
+                    self.__logger.info(f"Scanning folder {self.__directory_to_monitor} for change ====")
+                    files = []
+                    for file_extension in self.__file_extensions_to_monitor:
+                        files.extend(self.__directory_to_monitor.rglob(file_extension))
                     files.sort(key=os.path.getmtime)
                     if len(files) > 0:
                         # remove most recent file as it is considerred the active file
-                        #self.__logger.info(f"The current active file is : {files.pop()}")
+                        # self.__logger.info(f"The current active file is : {files.pop()}")
                         self.__logger.info(f"There is(are) {len(files)} file(s) to upload...")
                     fileset = set(files) - self.__filesProcessed
 
@@ -136,7 +147,7 @@ class DirectoryUploader:
                         self.__logger.debug("FINAL KEY VALUE: " + key)
 
                         s3_export_task_definition = S3ExportTaskDefinition(
-                            input_url="file://" + file, bucket=self.__bucket_name, key=key
+                            input_url=file.as_posix(), bucket=self.__bucket_name, key=key
                         )
                         payload = None
                         try:
@@ -162,13 +173,13 @@ class DirectoryUploader:
                     await asyncio.sleep(self.__interval)
                 else:
                     self.__logger.error(
-                        f"The path {base_dir} is not a directory, does not exists or greengrass user doesn't have sufficient (rwx) access."
+                        f"The path {self.__directory_to_monitor} is not a directory, does not exists or greengrass user doesn't have sufficient (rwx) access."
                     )
                     # let wait 1 minute before retrying
                     if not under_test:
                         await asyncio.sleep(60)
-            except Exception:
-                self.__logger.exception("Exception while scanning folder")
+            except Exception as exc:
+                self.__logger.exception(f"Exception while scanning folder: {exc}")
             keep_looping = not under_test
 
     async def __processStatus(self, under_test=False):
@@ -214,7 +225,7 @@ class DirectoryUploader:
                         )
 
                         # remove the file from the list of files already processed and let it be tried again.
-                        self.__filesProcessed.remove(file_url.partition("file://")[2])
+                        self.__filesProcessed.remove(file_url)
 
                     next_seq = message.sequence_number + 1
             except NotEnoughMessagesException:
@@ -226,9 +237,9 @@ class DirectoryUploader:
             await asyncio.sleep(self.__status_interval)
             keep_looping = not under_test
 
-    async def Run(self):
+    async def run(self):
         tasks = [asyncio.create_task(self.__scan()), asyncio.create_task(self.__processStatus())]
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
-    def Close(self):
+    def close(self):
         self.__client.close()

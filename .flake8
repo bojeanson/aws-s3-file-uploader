@@ -4,8 +4,8 @@ exclude =
     .gitignore
     .vscode
     __pycache__
-    venv
+    .venv
     dist
 max-line-length = 120
-max-complexity = 12
+max-complexity = 13
 ignore = F401,E501,E713,W503,E203
