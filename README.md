@@ -20,7 +20,7 @@ NOTE THAT THE FOLDER IN WHICH YOU CLONE OR UNZIP THIS COMPONENT NEEDS TO BE CALL
 ## Installing dependencies
 It is recommended to create a virtual environment to install dependencies. To do so, run the following commands in the root folder of this repo:  
 ```bash
- python3 -m venv .venv
+ python3.9 -m venv .venv
  source ./.venv/bin/activate
 ```
 
