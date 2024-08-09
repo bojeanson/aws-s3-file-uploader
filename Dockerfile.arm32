@@ -1,0 +1,12 @@
+FROM arm32v7/python:3.9-slim-bookworm
+
+WORKDIR /file_uploader
+COPY src .
+COPY pyproject.toml .
+COPY poetry.lock .
+COPY README.md .
+
+RUN pip install .
+
+ENTRYPOINT [ "python", "-m", "file_uploader" ]
+CMD [ ]

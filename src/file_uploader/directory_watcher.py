@@ -53,7 +53,7 @@ class DirectoryWatcher:
         bucket_prefix: str,
         logger: logging.Logger,
         interval: int,
-        client: StreamManagerClient = None,
+        stream_manager_client: StreamManagerClient = None,
     ):
         self.__directory_to_monitor = directory_to_monitor
         self.__file_extensions_to_monitor = file_extensions_to_monitor
@@ -61,9 +61,9 @@ class DirectoryWatcher:
         self.__bucket_path = bucket_prefix.removeprefix("/").removesuffix("/")
         self.__stream_name = bucket_name + "Stream"
         self.__status_stream_name = self.__stream_name + "Status"
-        self.__client = client
-        if self.__client is None:
-            self.__client = StreamManagerClient()
+        self.__stream_manager_client = stream_manager_client
+        if self.__stream_manager_client is None:
+            self.__stream_manager_client = StreamManagerClient()
         self.__logger = logger
         self.__status_interval = max(interval, 1)
         self.__filesProcessed = set()
@@ -76,13 +76,13 @@ class DirectoryWatcher:
         #   - Acknoledgment of file transfert will be missed. The file in question will be transferred again.
 
         try:
-            self.__client.delete_message_stream(stream_name=self.__status_stream_name)
+            self.__stream_manager_client.delete_message_stream(stream_name=self.__status_stream_name)
         except ResourceNotFoundException:
             pass
 
         # Try deleting the stream (if it exists) so that we have a fresh start
         try:
-            self.__client.delete_message_stream(stream_name=self.__stream_name)
+            self.__stream_manager_client.delete_message_stream(stream_name=self.__stream_name)
         except ResourceNotFoundException:
             pass
 
@@ -101,12 +101,12 @@ class DirectoryWatcher:
         )
 
         # Create the Status Stream.
-        self.__client.create_message_stream(
+        self.__stream_manager_client.create_message_stream(
             MessageStreamDefinition(name=self.__status_stream_name, strategy_on_full=StrategyOnFull.OverwriteOldestData)
         )
 
         # Create the message stream with the S3 Export definition.
-        self.__client.create_message_stream(
+        self.__stream_manager_client.create_message_stream(
             MessageStreamDefinition(
                 name=self.__stream_name, strategy_on_full=StrategyOnFull.OverwriteOldestData, export_definition=exports
             )
@@ -163,7 +163,7 @@ class DirectoryWatcher:
                         if payload is not None:
                             self.__logger.info(
                                 "Successfully appended S3 Task Definition to stream with sequence number %d",
-                                self.__client.append_message(self.__stream_name, payload),
+                                self.__stream_manager_client.append_message(self.__stream_name, payload),
                             )
                     # we could compute the new self.__filesProcessed as self.__filesProcessed.union(fileset)
                     # but that would mean an ever growing set
@@ -190,7 +190,7 @@ class DirectoryWatcher:
         while keep_looping:
             try:
                 self.__logger.info("Reading messages from status stream")
-                messages_list = self.__client.read_messages(
+                messages_list = self.__stream_manager_client.read_messages(
                     self.__status_stream_name,
                     ReadMessagesOptions(
                         desired_start_sequence_number=next_seq,
@@ -242,4 +242,4 @@ class DirectoryWatcher:
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
     def close(self):
-        self.__client.close()
+        self.__stream_manager_client.close()
