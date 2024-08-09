@@ -40,7 +40,7 @@ class TestDirectoryUploader:
         mock_client = MagicMock()
         append_mock = MagicMock()
         mock_client.append_message = append_mock
-        du = DirectoryWatcher("test-bucket", tmp_path, ["*.csv"], "", self.logger, 1, client=mock_client)
+        du = DirectoryWatcher("test-bucket", tmp_path, ["*.csv"], "", self.logger, 1, stream_manager_client=mock_client)
         loop = asyncio.get_event_loop()
 
         # When
@@ -83,7 +83,7 @@ class TestDirectoryUploader:
         read_messages_mock.return_value = message_list
         mock_client.read_messages = read_messages_mock
 
-        du = DirectoryWatcher("test-bucket", tmp_path, ["*.csv"], "", self.logger, 1, client=mock_client)
+        du = DirectoryWatcher("test-bucket", tmp_path, ["*.csv"], "", self.logger, 1, stream_manager_client=mock_client)
         loop = asyncio.get_event_loop()
 
         loop.run_until_complete(du._DirectoryWatcher__processStatus(under_test=True))
@@ -108,7 +108,7 @@ class TestDirectoryUploader:
         mock_error = MagicMock()
         mock_logger.error = mock_error
 
-        du = DirectoryWatcher("test-bucket", fakedir, ["*.cvs"], "", mock_logger, 1, client=mock_client)
+        du = DirectoryWatcher("test-bucket", fakedir, ["*.cvs"], "", mock_logger, 1, stream_manager_client=mock_client)
         loop = asyncio.get_event_loop()
         loop.run_until_complete(du._DirectoryWatcher__scan(under_test=True))
         mock_client.assert_not_called()
@@ -131,7 +131,9 @@ class TestDirectoryUploader:
         mock_error = MagicMock()
         mock_logger.exception = mock_error
 
-        du = DirectoryWatcher("test-bucket", tmp_path, ["/test*/test1.csv"], "", mock_logger, 1, client=mock_client)
+        du = DirectoryWatcher(
+            "test-bucket", tmp_path, ["/test*/test1.csv"], "", mock_logger, 1, stream_manager_client=mock_client
+        )
         loop = asyncio.get_event_loop()
         loop.run_until_complete(du._DirectoryWatcher__scan(under_test=True))
         mock_client.assert_not_called()
